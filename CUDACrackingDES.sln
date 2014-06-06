@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CUDACrackingDES", "CUDACrackingDES\CUDACrackingDES.vcxproj", "{A8CCDA9C-AB33-4C41-86AF-811A511F9191}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CPUCrackingDES", "CPUCrackingDES\CPUCrackingDES.vcxproj", "{7C23B5A9-F965-4DE8-BED7-551F69A7D37A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A8CCDA9C-AB33-4C41-86AF-811A511F9191}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A8CCDA9C-AB33-4C41-86AF-811A511F9191}.Debug|Win32.Build.0 = Debug|Win32
+		{A8CCDA9C-AB33-4C41-86AF-811A511F9191}.Release|Win32.ActiveCfg = Release|Win32
+		{A8CCDA9C-AB33-4C41-86AF-811A511F9191}.Release|Win32.Build.0 = Release|Win32
+		{7C23B5A9-F965-4DE8-BED7-551F69A7D37A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7C23B5A9-F965-4DE8-BED7-551F69A7D37A}.Debug|Win32.Build.0 = Debug|Win32
+		{7C23B5A9-F965-4DE8-BED7-551F69A7D37A}.Release|Win32.ActiveCfg = Release|Win32
+		{7C23B5A9-F965-4DE8-BED7-551F69A7D37A}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
