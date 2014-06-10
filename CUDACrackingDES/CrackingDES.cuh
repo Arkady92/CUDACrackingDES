@@ -8,7 +8,6 @@ using namespace std;
 #define SHIFTSLEN 16
 #define BLOCKSLEN PC1LEN/2
 #define KEYCOUNT 16
-#define MSGLEN 64
 #define IPMSGCOUNT 16
 #define EXTENDEDLEN 48
 #define SBOXCOUNT 8
@@ -16,4 +15,12 @@ using namespace std;
 #define SBLOCKSIZE 6
 #define SCOLUMNS 16
 #define SROWS 4
-int main();
+
+#define SHORTMSGLEN 12 
+#define MAX_TEXT_LEN 8
+#define SIGN_SIZE 8
+
+
+#define MSGLEN 8
+#define MSGBITLEN 64
+#define BLOCKSIZE 512
