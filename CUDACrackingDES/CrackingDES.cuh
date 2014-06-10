@@ -20,7 +20,7 @@ using namespace std;
 #define MAX_TEXT_LEN 8
 #define SIGN_SIZE 8
 
-
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 #define MSGLEN 8
 #define MSGBITLEN 64
 #define BLOCKSIZE 512

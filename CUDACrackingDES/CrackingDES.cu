@@ -1,21 +1,27 @@
 #include "Arrays.cuh"
 #include "CrackingDES.cuh"
 
-inline void gpuAssert(cudaError_t code, char *file, int line, bool abort)
+inline void gpuAssert(cudaError_t code, char *file, int line)
 {
 	if (code != cudaSuccess) 
 	{
 		fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-		if (abort) exit(code);
+		exit(code);
 	}
 }
+
+struct result
+{
+	bool isCracked;
+	int keyNumber;
+};
 
 void encipherTextCPU(short * message, short * key, short * cipherMessage)
 {
 	short C[SHIFTSLEN+1][BLOCKSLEN];
 	short D[SHIFTSLEN+1][BLOCKSLEN];
-	short L[IPMSGCOUNT+1][MSGLEN/2];
-	short R[IPMSGCOUNT+1][MSGLEN/2];
+	short L[IPMSGCOUNT+1][MSGBITLEN/2];
+	short R[IPMSGCOUNT+1][MSGBITLEN/2];
 	short expandedR[EXTENDEDLEN];
 	short sboxes[SBOXCOUNT][SBOXSIZE];
 	short keys[KEYCOUNT][PC2LEN];
@@ -46,10 +52,10 @@ void encipherTextCPU(short * message, short * key, short * cipherMessage)
 		}
 	}
 
-	for(int i = 0; i < MSGLEN/2; i++)
+	for(int i = 0; i < MSGBITLEN/2; i++)
 	{
 		L[0][i] = message[IP[i]-1];
-		R[0][i] = message[IP[MSGLEN/2 + i]-1];
+		R[0][i] = message[IP[MSGBITLEN/2 + i]-1];
 	}
 
 	for(int i = 1; i < IPMSGCOUNT+1; i++)
@@ -67,18 +73,18 @@ void encipherTextCPU(short * message, short * key, short * cipherMessage)
 			for(int k = 0; k < SBOXSIZE; k++)
 				sboxes[j][SBOXSIZE - k -1] = (sValue & (mask << k)) >> k;
 		}
-					for(int j = 0; j < MSGLEN/2; j++)
+					for(int j = 0; j < MSGBITLEN/2; j++)
 		{
 			L[i][j] = R[i-1][j];
 			R[i][j] = (L[i-1][j] + sboxes[(P[j]-1) / SBOXSIZE][(P[j]-1) % SBOXSIZE]) % 2;
 		}
 	}
-	for(int i = 0; i < MSGLEN; i++)
+	for(int i = 0; i < MSGBITLEN; i++)
 	{
-		if(reverseIP[i] < MSGLEN/2)
+		if(reverseIP[i] < MSGBITLEN/2)
 			cipherMessage[i] = R[16][reverseIP[i] - 1];
 		else
-			cipherMessage[i] = L[16][reverseIP[i] - 1 - MSGLEN/2];
+			cipherMessage[i] = L[16][reverseIP[i] - 1 - MSGBITLEN/2];
 	}
 }
 
@@ -86,8 +92,8 @@ __device__ void encipherTextGPU(short * message, short * key, short * cipherMess
 {
 	short C[SHIFTSLEN+1][BLOCKSLEN];
 	short D[SHIFTSLEN+1][BLOCKSLEN];
-	short L[IPMSGCOUNT+1][MSGLEN/2];
-	short R[IPMSGCOUNT+1][MSGLEN/2];
+	short L[IPMSGCOUNT+1][MSGBITLEN/2];
+	short R[IPMSGCOUNT+1][MSGBITLEN/2];
 	short expandedR[EXTENDEDLEN];
 	short sboxes[SBOXCOUNT][SBOXSIZE];
 	short keys[KEYCOUNT][PC2LEN];
@@ -117,10 +123,10 @@ __device__ void encipherTextGPU(short * message, short * key, short * cipherMess
 				keys[i-1][j] = D[i][d_PC2[j]-BLOCKSLEN-1];
 		}
 	}
-	for(int i = 0; i < MSGLEN/2; i++)
+	for(int i = 0; i < MSGBITLEN/2; i++)
 	{
 		L[0][i] = message[d_IP[i]-1];
-		R[0][i] = message[d_IP[MSGLEN/2 + i]-1];
+		R[0][i] = message[d_IP[MSGBITLEN/2 + i]-1];
 	}
 	for(int i = 1; i < IPMSGCOUNT+1; i++)
 	{
@@ -138,21 +144,24 @@ __device__ void encipherTextGPU(short * message, short * key, short * cipherMess
 				sboxes[j][SBOXSIZE - k -1] = (sValue & (mask << k)) >> k;
 		}
 
-		for(int j = 0; j < MSGLEN/2; j++)
+		for(int j = 0; j < MSGBITLEN/2; j++)
 		{
 			L[i][j] = R[i-1][j];
 			R[i][j] = (L[i-1][j] + sboxes[(d_P[j]-1) / SBOXSIZE][(d_P[j]-1) % SBOXSIZE]) % 2;
 		}
 	}
 	*result = true;
-	for(int i = 0; i < MSGLEN; i++)
+	for(int i = 0; i < MSGBITLEN; i++)
 	{
-		if(d_reverseIP[i] < MSGLEN/2 && R[16][d_reverseIP[i] - 1] != cipherMessage[i])
+		if(d_reverseIP[i] < MSGBITLEN/2)
 		{
-			*result = false;
-			break;
+			if(R[16][d_reverseIP[i] - 1] != cipherMessage[i])
+			{
+				*result = false;
+				break;
+			}
 		}
-		else if(L[16][d_reverseIP[i] - 1 - MSGLEN/2] != cipherMessage[i])
+		else if(L[16][d_reverseIP[i] - 1 - MSGBITLEN/2] != cipherMessage[i])
 		{
 			*result = false;
 			break;
@@ -164,7 +173,7 @@ __device__ void encipherTextGPU(short * message, short * key, short * cipherMess
 
 __host__ __device__ void convertSignToBitArray(char sign, short * resultArray)
 {
-	memset(resultArray, 0 ,SIGN_SIZE);
+	//memset(resultArray, 0 ,SIGN_SIZE);
 	char mask = 1;
 	for(int i = 0; i < SIGN_SIZE; i++)
 	 resultArray[i] = (sign & (mask << i)) >> i;
@@ -172,7 +181,7 @@ __host__ __device__ void convertSignToBitArray(char sign, short * resultArray)
 
 __host__ __device__ void convertTextToBitArray(char * text, int length, short * resultArray)
 {
-	memset(resultArray, 0 ,length);
+	//memset(resultArray, 0 ,length);
 	for(int i = 0; i < MAX_TEXT_LEN; i++)
 	{
 		if(i < length)
@@ -188,7 +197,7 @@ __host__ __device__ void generatePermutation(int combination, int signsCount, in
 	for(int i = 0; i < length; i++)
 	{
 		int res = combination % signsCount;
-		switch(res)
+		/*switch(res)
 		{
 		case 0:
 			resultArray[i] = 'a';
@@ -199,35 +208,52 @@ __host__ __device__ void generatePermutation(int combination, int signsCount, in
 		case 2:
 			resultArray[i] = 'c';
 			break;
-		}
+		}*/
+		resultArray[i] = 'a' + res;
 		combination /= signsCount;
 	}
 }
 
-__global__ void CrackingDESKernel(short * _cipherText, short * _plainText, int keyLength, bool * result)
+__global__ void CrackingDESKernel(short * _cipherText, short * _plainText, int signsCount, int threadsCount, int keyLength, struct result * result)
 {
 	__shared__ short cipherText[MSGBITLEN];
 	__shared__ short plainText[MSGBITLEN];
 	
 	int position = blockIdx.x*BLOCKSIZE + threadIdx.x;
-	if(position < MSGBITLEN)
-	{
-		cipherText[position] = _cipherText[position];
-		plainText[position] = _plainText[position];
-	}
-	__syncthreads();
+	//for(int i = 0; i < signsCount; i++)
+	//{
+		if(position < MSGBITLEN)
+		{
+			cipherText[position] = _cipherText[position];
+			plainText[position] = _plainText[position];
+		}
+		//convertSignToBitArray('a' + i ,plainText + MSGBITLEN - SIGN_SIZE - 1);
+		__syncthreads();
 
-	char * code = new char[MSGLEN];
-	short * key = new short[MSGBITLEN];
-	bool * res = new bool[1];
-	generatePermutation(position, keyLength, MSGLEN, code);
-	convertTextToBitArray(code,keyLength,key);
-	encipherTextGPU(plainText, key, cipherText, res);
-	delete[] code;
-	delete[] key;
-	if(*res)
-		*result = true;
+		if(position >= threadsCount)
+			return;
+		char * code = new char[MSGLEN];
+		short * key = new short[MSGBITLEN];
+		bool * res = new bool[1];
+		generatePermutation(position, signsCount, MSGLEN, code);
+		char sign;
+		convertTextToBitArray(code,keyLength,key);
+		encipherTextGPU(plainText, key, cipherText, res);
+		delete[] code;
+		delete[] key;
+		if(*res)
+		{
+			result->isCracked = true;
+			result->keyNumber = position;
+		}
+	//}
+		//__syncthreads();
 	return;
+}
+void ERR(char *msg)
+{
+	fprintf(stderr,"Error: %s\n", msg);
+	exit(1);
 }
 
 int main()
@@ -242,6 +268,10 @@ int main()
 
 	short * d_cipherText, * d_plainText;
 
+	int signsCount = 0;
+	printf("Enter the alphabet size.\n");
+	scanf("%d", &signsCount);
+
 	printf("Enter the plain text.\n");
 	scanf("%s", plainText);
 	convertTextToBitArray(plainText,8,plainBitText);
@@ -254,47 +284,79 @@ int main()
 
 	encipherTextCPU(plainBitText, keyBit, cipherBitText);
 
-	cudaMalloc((void**) &d_cipherText, sizeof(short)*MSGBITLEN);
-	cudaMemcpy(d_cipherText, cipherBitText, sizeof(short)*MSGBITLEN, cudaMemcpyHostToDevice);
+	printf("Cipher text generated from given text and key, now lets try to crack it.\n");
 
-	cudaMalloc((void**) &d_plainText, sizeof(short)*MSGBITLEN);
+	if(cudaMalloc((void**) &d_cipherText, sizeof(short)*MSGBITLEN) != cudaSuccess)
+		ERR("cudaMalloc");
+	if(cudaMemcpy(d_cipherText, cipherBitText, sizeof(short)*MSGBITLEN, cudaMemcpyHostToDevice) != cudaSuccess)
+		ERR("cudaMemcpy");
 
-	cudaEventCreate(&timerStart, 0);
-	cudaEventCreate(&timerStop, 0);
-	cudaEventRecord(timerStart, 0);
+	if(cudaMalloc((void**) &d_plainText, sizeof(short)*MSGBITLEN) != cudaSuccess)
+		ERR("cudaMalloc");
 
 	long messageCombination = 0;
-	long keyCombination = 0;
 	char * code = new char[MSGLEN];
 
 	int threadsCount = 1;
 	for(int i = 0; i < keyLength; i++)
-		threadsCount *= keyLength;
-	int blocksCount = threadsCount / BLOCKSIZE;
+		threadsCount *= signsCount;
+	int blocksCount = threadsCount / BLOCKSIZE + 1;
 
-	bool * result = new bool[1];
-	result[0] = false;
-	bool * d_result;
-	cudaMalloc((void**) &d_result, sizeof(bool));
-	cudaMemcpy(d_result, result, sizeof(bool), cudaMemcpyHostToDevice);
+	struct result * result = new struct result;
+	result->isCracked = false;
+	result->keyNumber = -1;
+	struct result * d_result;
+	if(cudaMalloc((void**) &d_result, sizeof(struct result)) != cudaSuccess)
+		ERR("cudaMalloc");
+	if(cudaMemcpy(d_result, result, sizeof(struct result), cudaMemcpyHostToDevice) != cudaSuccess)
+		ERR("cudaMemcpy");
 
-	while(messageCombination < 6561)
+	long long textsCount = 1;
+	for(int i = 0; i < MSGLEN; i++)
+		textsCount *= signsCount;
+
+	cudaEventCreate(&timerStart, 0);
+	cudaEventCreate(&timerStop, 0);
+
+	cudaEventRecord(timerStart, 0);
+	while(messageCombination < textsCount)
 	{
+		printf("Cracking iteration %d of %d\n",messageCombination, textsCount);
 		generatePermutation(messageCombination++, 3, 8, code);
 		convertTextToBitArray(code,8,plainBitText);
-		cudaMemcpy(d_plainText, plainBitText, sizeof(short)*MSGBITLEN, cudaMemcpyHostToDevice);
+		if(cudaMemcpy(d_plainText, plainBitText, sizeof(short)*MSGBITLEN, cudaMemcpyHostToDevice) != cudaSuccess)
+			ERR("cudaMemcpy");
 
-		CrackingDESKernel<<<blocksCount,BLOCKSIZE>>>(d_cipherText, d_plainText, keyLength, result);
-		cudaDeviceSynchronize();
-		cudaMemcpy(d_result, result, sizeof(bool), cudaMemcpyDeviceToHost);
-		if(*result)
+		CrackingDESKernel<<<blocksCount,BLOCKSIZE>>>(d_cipherText, d_plainText, signsCount, threadsCount, keyLength, d_result);
+		gpuErrchk(cudaPeekAtLastError());
+		if(cudaDeviceSynchronize() != cudaSuccess)
+			ERR("cudaDeviceSynchronize");
+		if(cudaMemcpy(result, d_result, sizeof(struct result), cudaMemcpyDeviceToHost) != cudaSuccess)
+			ERR("cudaMemcpy");
+		if(result->isCracked)
 		{
-			printf("CRACKED");
+			printf("MESSAGE CRACKED\n");
+			printf("MSG: ");
+			for(int i=0; i < MSGLEN; i++)
+				printf("%c",code[i]);
+			printf("\n");
+			generatePermutation(result->keyNumber, signsCount, MSGLEN, code);
+			printf("KEY: ");
+			for(int i=0; i < keyLength; i++)
+				printf("%c",code[i]);
+			printf("\n");
 			break;
 		}
 	}
 
-	cudaEventRecord(timerStop, 0);
+	if(cudaEventRecord(timerStop, 0) != cudaSuccess)
+		ERR("cudaEventRecord");
+
+	if(cudaEventSynchronize(timerStop) != cudaSuccess)
+		ERR("cudaEventSynchronize");
+
+	if(cudaDeviceSynchronize() != cudaSuccess)
+		ERR("cudaDeviceSynchronize");
 
 	cudaEventElapsedTime(&timer, timerStart, timerStop);
 
@@ -305,8 +367,10 @@ int main()
 	cudaEventDestroy(timerStart);
 	cudaEventDestroy(timerStop);
 
-	cudaFree(d_cipherText);
-	cudaFree(d_plainText);
+	if(cudaFree(d_cipherText) != cudaSuccess)
+			ERR("cudaFree");
+	if(cudaFree(d_plainText) != cudaSuccess)
+			ERR("cudaFree");
 
 	delete[] plainText;
 	delete[] key;
