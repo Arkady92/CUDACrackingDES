@@ -325,7 +325,7 @@ int main()
 			generatePermutation(messageCombination, signsCount, MSGLEN, code);
 		else
 			generateRandomPermutation(signsCount, MSGLEN, code);
-		convertTextToBitArray(code,8,plainBitText);
+		convertTextToBitArray(code,MSGLEN,plainBitText);
 		messageCombination++;
 		if(cudaMemcpy(d_plainText, plainBitText, sizeof(short)*MSGBITLEN, cudaMemcpyHostToDevice) != cudaSuccess)
 			ERR("cudaMemcpy");
