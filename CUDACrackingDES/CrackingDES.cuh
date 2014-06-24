@@ -24,3 +24,4 @@ using namespace std;
 #define MSGLEN 8
 #define MSGBITLEN 64
 #define BLOCKSIZE 512
+#define MAXBLOCKCOUNT 128
